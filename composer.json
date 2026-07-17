@@ -1,0 +1,12 @@
+{
+    "name": "nutriweb/mergesavedcart",
+    "type": "prestashop-module",
+    "autoload": {
+        "psr-4": {
+            "MergeSavedCart\\": "src/"
+        }
+    },
+    "config": {
+        "prepend-autoloader": false
+    }
+}

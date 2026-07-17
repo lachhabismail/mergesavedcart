@@ -1,0 +1,7 @@
+services:
+  mergesavedcart.customer_configuration_guard:
+    class: 'MergeSavedCart\Configuration\CustomerConfigurationGuard'
+    decorates: 'prestashop.adapter.customer.customer_configuration'
+    arguments:
+      - '@mergesavedcart.customer_configuration_guard.inner'
+    public: true

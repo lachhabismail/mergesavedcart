@@ -1,0 +1,4 @@
+services:
+  mergesavedcart.abandoned_cart_finder:
+    class: 'MergeSavedCart\Service\AbandonedCartFinder'
+    public: true
