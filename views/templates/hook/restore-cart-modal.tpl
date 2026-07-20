@@ -1,4 +1,4 @@
-{if !empty($mergesavedcart_products) || !isset($is_cachable_page) || (isset($is_cachable_page) && !$is_cachable_page)}
+{if !empty($mergesavedcart_products) && (!isset($is_cachable_page) || (isset($is_cachable_page) && !$is_cachable_page))}
 <div class="modal fade"
      id="mergesavedcart-restore-modal"
      tabindex="-1"
