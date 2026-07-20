@@ -5,6 +5,7 @@
      aria-labelledby="mergesavedcart-restore-modal-label"
      aria-hidden="true"
      data-restore-url="{$mergesavedcart_restore_url}"
+     data-id-abandoned-cart="{$mergesavedcart_abandoned_cart_id}"
      data-bs-backdrop="static"
      data-bs-keyboard="false">
   <div class="modal-dialog modal-dialog-centered">

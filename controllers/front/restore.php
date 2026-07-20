@@ -44,11 +44,12 @@ class MergeSavedCartRestoreModuleFrontController extends ModuleFrontController
         }
 
         $action = Tools::getValue('action');
+        $idAbandonedCart = (int) Tools::getValue('id_abandoned_cart');
 
         if ($action === 'add') {
-            $this->processAdd($idCustomer);
+            $this->processAdd($idCustomer, $idAbandonedCart);
         } elseif ($action === 'dismiss') {
-            $this->processDismiss($idCustomer);
+            $this->processDismiss($idCustomer, $idAbandonedCart);
         } else {
             $this->ajaxRender(json_encode(['success' => false]));
         }
@@ -56,10 +57,11 @@ class MergeSavedCartRestoreModuleFrontController extends ModuleFrontController
 
     /**
      * @param int $idCustomer
+     * @param int $idAbandonedCart
      *
      * @return void
      */
-    private function processAdd(int $idCustomer)
+    private function processAdd(int $idCustomer, int $idAbandonedCart)
     {
         $this->ensureValidCart($idCustomer);
 
@@ -90,7 +92,7 @@ class MergeSavedCartRestoreModuleFrontController extends ModuleFrontController
             (int) $this->context->cart->id
         );
 
-        $this->deleteAbandonedCart($idCustomer);
+        $this->deleteAbandonedCart($idCustomer, $idAbandonedCart);
 
         $this->ajaxRender(json_encode(['success' => true, 'added' => $added]));
     }
@@ -153,10 +155,11 @@ class MergeSavedCartRestoreModuleFrontController extends ModuleFrontController
 
     /**
      * @param int $idCustomer
+     * @param int $idAbandonedCart
      *
      * @return void
      */
-    private function processDismiss(int $idCustomer)
+    private function processDismiss(int $idCustomer, int $idAbandonedCart)
     {
         PrestaShopLogger::addLog(
             sprintf('MergeSavedCart: customer #%d ignored the abandoned cart restoration proposal.', $idCustomer),
@@ -166,24 +169,26 @@ class MergeSavedCartRestoreModuleFrontController extends ModuleFrontController
             (int) $this->context->cart->id
         );
 
-        $this->deleteAbandonedCart($idCustomer);
+        $this->deleteAbandonedCart($idCustomer, $idAbandonedCart);
 
         $this->ajaxRender(json_encode(['success' => true]));
     }
 
     /**
      * Deletes the abandoned cart the proposal was built from, so it isn't
-     * offered again on a future login, and clears the cookie pinning it.
+     * offered again on a future login. The id comes straight from the client
+     * (the modal's data-id-abandoned-cart attribute, computed fresh server-side
+     * on the page that rendered it) rather than a cookie — safe because
+     * ownership is re-checked below regardless of what the client sends.
      * Silently no-ops if the id is missing or doesn't belong to the customer.
      *
      * @param int $idCustomer
+     * @param int $idAbandonedCart
      *
      * @return void
      */
-    private function deleteAbandonedCart(int $idCustomer)
+    private function deleteAbandonedCart(int $idCustomer, int $idAbandonedCart)
     {
-        $idAbandonedCart = (int) $this->context->cookie->{MergeSavedCart::ABANDONED_CART_COOKIE_KEY};
-
         if ($idAbandonedCart <= 0) {
             return;
         }
@@ -191,14 +196,6 @@ class MergeSavedCartRestoreModuleFrontController extends ModuleFrontController
         /** @var AbandonedCartFinder $finder */
         $finder = $this->get('mergesavedcart.abandoned_cart_finder');
 
-        if ($finder->deleteAbandonedCart($idCustomer, $idAbandonedCart)) {
-            unset($this->context->cookie->{MergeSavedCart::ABANDONED_CART_COOKIE_KEY});
-
-            // This is an ajax=true controller: Controller::run() only calls
-            // display()/smartyOutputContent() (where Cookie::write() normally
-            // happens) for non-ajax controllers. Without this explicit call,
-            // the unset above would never reach the browser.
-            $this->context->cookie->write();
-        }
+        $finder->deleteAbandonedCart($idCustomer, $idAbandonedCart);
     }
 }

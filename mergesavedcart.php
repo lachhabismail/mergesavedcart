@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Copyright since 2026 Nutriweb
  *
@@ -22,15 +23,6 @@ use MergeSavedCart\Service\AbandonedCartFinder;
 
 class MergeSavedCart extends Module
 {
-    /**
-     * Cookie key holding the abandoned cart's id, set once by
-     * hookActionAuthentication() right after login and read by
-     * hookDisplayModalContent()/hookActionFrontControllerSetMedia() on every
-     * subsequent page view until the customer acts on the proposal (see
-     * restore.php, which clears it via AbandonedCartFinder::deleteAbandonedCart()).
-     */
-    const ABANDONED_CART_COOKIE_KEY = 'mergesavedcartAbandonedCartId';
-
     public function __construct()
     {
         $this->name = 'mergesavedcart';
@@ -54,7 +46,6 @@ class MergeSavedCart extends Module
     public function install()
     {
         return parent::install()
-            && $this->registerHook('actionAuthentication')
             && $this->registerHook('displayModalContent')
             && $this->registerHook('actionFrontControllerSetMedia')
             && $this->registerHook('actionCustomerPreferencesPageSave');
@@ -66,41 +57,6 @@ class MergeSavedCart extends Module
     public function uninstall()
     {
         return parent::uninstall();
-    }
-
-    /**
-     * Right after login: looks up whether the customer has an abandoned
-     * cart and stashes only its id in a cookie. No product data is computed
-     * here — the current cart can still change before the customer ever
-     * sees the modal, so the eligible-products diff is deferred to display
-     * time (hookDisplayModalContent).
-     *
-     * @param array $params ['customer' => Customer]
-     */
-    public function hookActionAuthentication(array $params)
-    {
-        /** @var Customer $customer */
-        $customer = $params['customer'];
-            
-        if (empty($customer) || !$customer->id) {
-            return;
-        }
-        
-        /** @var AbandonedCartFinder $finder */
-        $finder = $this->context->controller->getContainer()->get('mergesavedcart.abandoned_cart_finder');
-        $idAbandonedCart = $finder->findAbandonedCartId((int) $customer->id, (int) $this->context->cart->id);
-        
-        if ($idAbandonedCart) {
-            $this->context->cookie->{self::ABANDONED_CART_COOKIE_KEY} = $idAbandonedCart;
-        } else {
-            unset($this->context->cookie->{self::ABANDONED_CART_COOKIE_KEY});
-        }
-
-        // Login always ends in a redirect (Tools::redirect()/redirectWithNotifications()),
-        // which exits before smartyOutputContent() ever runs — the only place
-        // Cookie::write() is normally called. Without this explicit call, the
-        // change above would never reach the browser.
-        $this->context->cookie->write();
     }
 
     /**
@@ -118,7 +74,9 @@ class MergeSavedCart extends Module
      */
     public function hookDisplayModalContent()
     {
-        $idAbandonedCart = (int) $this->context->cookie->{self::ABANDONED_CART_COOKIE_KEY};
+        /** @var AbandonedCartFinder $finder */
+        $finder = $this->context->controller->getContainer()->get('mergesavedcart.abandoned_cart_finder');
+        $idAbandonedCart = $finder->findAbandonedCartId((int) $this->context->customer->id, (int) $this->context->cart->id);
         if ($idAbandonedCart <= 0 || !$this->context->customer->isLogged()) {
             return '';
         }
@@ -132,14 +90,13 @@ class MergeSavedCart extends Module
         );
 
         if (empty($proposal['products'])) {
-            unset($this->context->cookie->{self::ABANDONED_CART_COOKIE_KEY});
-
             return '';
         }
 
         $this->context->smarty->assign([
             'mergesavedcart_products' => $finder->presentProducts($proposal['products']),
             'mergesavedcart_restore_url' => $this->context->link->getModuleLink($this->name, 'restore', [], true),
+            'mergesavedcart_abandoned_cart_id' => $idAbandonedCart,
         ]);
 
         return $this->fetch('module:mergesavedcart/views/templates/hook/restore-cart-modal.tpl');
@@ -147,13 +104,11 @@ class MergeSavedCart extends Module
 
     public function hookActionFrontControllerSetMedia()
     {
-        if (!empty($this->context->cookie->{self::ABANDONED_CART_COOKIE_KEY})) {
-            $this->context->controller->registerJavascript(
-                'mergesavedcart-restore-modal',
-                'modules/' . $this->name . '/views/js/restore-cart-modal.js',
-                ['position' => 'bottom', 'priority' => 150]
-            );
-        }
+        $this->context->controller->registerJavascript(
+            'mergesavedcart-restore-modal',
+            'modules/' . $this->name . '/views/js/restore-cart-modal.js',
+            ['position' => 'bottom', 'priority' => 150]
+        );
     }
 
     /**

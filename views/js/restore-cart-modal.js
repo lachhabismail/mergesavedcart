@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var restoreUrl = modalElement.getAttribute('data-restore-url');
+  var idAbandonedCart = modalElement.getAttribute('data-id-abandoned-cart');
   var productCheckboxes = modalElement.querySelectorAll('.mergesavedcart-product-checkbox');
   var addButton = document.getElementById('mergesavedcart-add-selected');
   var dismissButton = document.getElementById('mergesavedcart-dismiss');
@@ -30,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
   modalElement.removeAttribute('data-bs-target');
 
   function postAction(action, extraFields) {
-    var body = new URLSearchParams(Object.assign({ action: action }, extraFields));
+    var body = new URLSearchParams(Object.assign({ action: action, id_abandoned_cart: idAbandonedCart }, extraFields));
 
     // credentials/X-Requested-With match themes/custom/src/js/quickview.ts's own
     // fetch() call — without explicit credentials, this shop's multiple shop
