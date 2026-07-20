@@ -1,4 +1,4 @@
-{if !empty($mergesavedcart_products)}
+{if !empty($mergesavedcart_products) || !isset($is_cachable_page) || (isset($is_cachable_page) && !$is_cachable_page)}
 <div class="modal fade"
      id="mergesavedcart-restore-modal"
      tabindex="-1"
@@ -45,7 +45,7 @@
         <button type="button" class="btn btn-primary" id="mergesavedcart-add-selected">
           {l s='Add to cart' d='Modules.Mergesavedcart.Shop'}
         </button>
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="mergesavedcart-dismiss">
+        <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal" id="mergesavedcart-dismiss">
           {l s='No, thanks' d='Modules.Mergesavedcart.Shop'}
         </button>
       </div>

@@ -114,11 +114,9 @@ class MergeSavedCart extends Module
      * deep inside that nested structure instead, which risked the modal
      * being visually trapped by an ancestor's stacking context.
      *
-     * @param array $params
-     *
      * @return string
      */
-    public function hookDisplayModalContent(array $params)
+    public function hookDisplayModalContent()
     {
         $idAbandonedCart = (int) $this->context->cookie->{self::ABANDONED_CART_COOKIE_KEY};
         if ($idAbandonedCart <= 0 || !$this->context->customer->isLogged()) {
