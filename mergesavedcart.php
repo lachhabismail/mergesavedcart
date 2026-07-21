@@ -97,6 +97,10 @@ class MergeSavedCart extends Module
             'mergesavedcart_products' => $finder->presentProducts($proposal['products']),
             'mergesavedcart_restore_url' => $this->context->link->getModuleLink($this->name, 'restore', [], true),
             'mergesavedcart_abandoned_cart_id' => $idAbandonedCart,
+            // Single shop-level currency for the JS-side add_to_cart GTM event
+            // (gtm module convention: currency lives once at ecommerce root, not
+            // repeated per item) — never displayed, only read via data-currency.
+            'mergesavedcart_currency' => $this->context->currency->iso_code,
         ]);
 
         return $this->fetch('module:mergesavedcart/views/templates/hook/restore-cart-modal.tpl');

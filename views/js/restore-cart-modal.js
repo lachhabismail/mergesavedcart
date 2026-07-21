@@ -7,9 +7,49 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var restoreUrl = modalElement.getAttribute('data-restore-url');
   var idAbandonedCart = modalElement.getAttribute('data-id-abandoned-cart');
+  var currency = modalElement.getAttribute('data-currency') || '';
   var productCheckboxes = modalElement.querySelectorAll('.mergesavedcart-product-checkbox');
   var addButton = document.getElementById('mergesavedcart-add-selected');
   var dismissButton = document.getElementById('mergesavedcart-dismiss');
+
+  // Mirrors the gtm module's own event_id shape (event + timestamp + random
+  // token) closely enough for consistency, without reaching into that
+  // module's JS — datalayer.js keeps its push()/makeEventId() private inside
+  // its own IIFE, so there is no shared function to call. Every other module
+  // in this ecosystem that emits GTM events pushes directly onto the shared
+  // window.dataLayer following the same conventions instead of a shared API.
+  function makeEventId(event) {
+    return event + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+  }
+
+  // Fires a standard GA4 add_to_cart event for the items the customer chose
+  // to keep from the saved cart. Only called after restore.php confirms the
+  // add actually succeeded (see addButton handler below) — never optimistically
+  // on click, since a failed/aborted request must not report a phantom add.
+  function pushAddToCart(items) {
+    if (!items.length) {
+      return;
+    }
+
+    var value = 0;
+    for (var i = 0; i < items.length; i++) {
+      value += items[i].price * items[i].quantity;
+    }
+    value = Math.round(value * 100) / 100;
+
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ ecommerce: null });
+
+    var evt = {
+      event: 'add_to_cart',
+      event_id: makeEventId('add_to_cart'),
+      ecommerce: { currency: currency, value: value, items: items },
+    };
+    if (window.gtmUserId) {
+      evt.user_id = String(window.gtmUserId);
+    }
+    window.dataLayer.push(evt);
+  }
 
   // No global `bootstrap`/Modal class is available to this classically-loaded
   // script (the theme only ever imports Bootstrap as an ES module inside its
@@ -52,18 +92,44 @@ document.addEventListener('DOMContentLoaded', function () {
 
   addButton.addEventListener('click', function () {
     var selectedProducts = [];
+    var gtmItems = [];
 
     productCheckboxes.forEach(function (checkbox) {
       if (checkbox.checked) {
+        var idProduct = parseInt(checkbox.getAttribute('data-id-product'), 10);
+        var idProductAttribute = parseInt(checkbox.getAttribute('data-id-product-attribute'), 10);
+        var quantity = parseInt(checkbox.getAttribute('data-quantity'), 10);
+
         selectedProducts.push({
-          id_product: parseInt(checkbox.getAttribute('data-id-product'), 10),
-          id_product_attribute: parseInt(checkbox.getAttribute('data-id-product-attribute'), 10),
-          quantity: parseInt(checkbox.getAttribute('data-quantity'), 10),
+          id_product: idProduct,
+          id_product_attribute: idProductAttribute,
+          quantity: quantity,
+        });
+
+        gtmItems.push({
+          item_id: idProduct + (idProductAttribute ? '-' + idProductAttribute : ''),
+          item_name: checkbox.getAttribute('data-name') || '',
+          price: parseFloat(checkbox.getAttribute('data-price')) || 0,
+          quantity: quantity,
         });
       }
     });
 
-    postAction('add', { products: JSON.stringify(selectedProducts) }).then(function () {
+    postAction('add', { products: JSON.stringify(selectedProducts) }).then(function (response) {
+      return response
+        .json()
+        .catch(function () {
+          return null;
+        })
+        .then(function (data) {
+          // Only report the event once the server confirms the add actually
+          // happened — matches the ecosystem-wide rule of never emitting a
+          // GTM event from an optimistic/assumed-successful client action.
+          if (data && data.success) {
+            pushAddToCart(gtmItems);
+          }
+        });
+    }).then(function () {
       window.location.reload();
     });
   });

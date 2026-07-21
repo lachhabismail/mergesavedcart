@@ -199,6 +199,11 @@ class AbandonedCartFinder
                 'quantity' => $quantity,
                 'unit_price' => $locale->formatPrice($unitPrice, $context->currency->iso_code),
                 'total_price' => $locale->formatPrice($unitPrice * $quantity, $context->currency->iso_code),
+                // Raw numeric price (tax included, same basis as unit_price above),
+                // never rendered in the template — it only feeds the JS-side
+                // add_to_cart GTM event's item.price/ecommerce.value, which needs a
+                // plain float rather than the locale-formatted display strings above.
+                'price' => round($unitPrice, 2),
                 'image_url' => $imageUrl,
             ];
         }

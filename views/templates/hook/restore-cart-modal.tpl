@@ -6,6 +6,7 @@
      aria-hidden="true"
      data-restore-url="{$mergesavedcart_restore_url}"
      data-id-abandoned-cart="{$mergesavedcart_abandoned_cart_id}"
+     data-currency="{$mergesavedcart_currency}"
      data-bs-backdrop="static"
      data-bs-keyboard="false">
   <div class="modal-dialog modal-dialog-centered">
@@ -25,7 +26,9 @@
                      checked
                      data-id-product="{$product.id_product}"
                      data-id-product-attribute="{$product.id_product_attribute}"
-                     data-quantity="{$product.quantity}">
+                     data-quantity="{$product.quantity}"
+                     data-name="{$product.name|escape:'quotes'}"
+                     data-price="{$product.price}">
               {if $product.image_url}
                 <div class="position-relative flex-shrink-0">
                   <img src="{$product.image_url}" alt="{$product.name|escape:'quotes'}" width="64" height="64">
