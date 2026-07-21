@@ -20,8 +20,8 @@
         </p>
         <ul class="list-group list-group-flush"{if $mergesavedcart_products|@count > 4} style="max-height: 430px; overflow-y: auto;"{/if}>
           {foreach from=$mergesavedcart_products item=product}
-            <li class="list-group-item d-flex align-items-center gap-3 py-3">
-              <input class="form-check-input flex-shrink-0 mergesavedcart-product-checkbox"
+            <li class="list-group-item d-flex align-items-center py-3">
+              <input class="form-check-input flex-shrink-0 mergesavedcart-product-checkbox me-3"
                      type="checkbox"
                      checked
                      data-id-product="{$product.id_product}"
@@ -30,7 +30,7 @@
                      data-name="{$product.name|escape:'quotes'}"
                      data-price="{$product.price}">
               {if $product.image_url}
-                <div class="position-relative flex-shrink-0">
+                <div class="position-relative flex-shrink-0 pe-3">
                   <img src="{$product.image_url}" alt="{$product.name|escape:'quotes'}" width="64" height="64">
                   <span class="badge badge-quantity sm">{$product.quantity}</span>
                 </div>
