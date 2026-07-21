@@ -36,6 +36,28 @@ function mergesavedcartInit() {
     return event + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
   }
 
+  // Prefers the full GA4 item (item_brand, item_variant, external_id,
+  // categories...) that AbandonedCartFinder::presentProducts() builds via the
+  // gtm module's own GtmDataLayer::mapItem() when that module is active —
+  // falls back to a bare item_id/item_name/price/quantity when it isn't (or
+  // if the JSON is somehow malformed), so this still works without gtm.
+  function buildGtmItem(checkbox, idProduct, idProductAttribute, quantity) {
+    var raw = checkbox.getAttribute('data-gtm-item');
+    if (raw) {
+      try {
+        var item = JSON.parse(raw);
+        item.quantity = quantity;
+        return item;
+      } catch (e) { /* fall through to the plain item below */ }
+    }
+    return {
+      item_id: idProduct + (idProductAttribute ? '-' + idProductAttribute : ''),
+      item_name: checkbox.getAttribute('data-name') || '',
+      price: parseFloat(checkbox.getAttribute('data-price')) || 0,
+      quantity: quantity,
+    };
+  }
+
   // Fires a standard GA4 add_to_cart event for the items the customer chose
   // to keep from the saved cart. Only called after restore.php confirms the
   // add actually succeeded (see addButton handler below) — never optimistically
@@ -120,12 +142,7 @@ function mergesavedcartInit() {
           quantity: quantity,
         });
 
-        gtmItems.push({
-          item_id: idProduct + (idProductAttribute ? '-' + idProductAttribute : ''),
-          item_name: checkbox.getAttribute('data-name') || '',
-          price: parseFloat(checkbox.getAttribute('data-price')) || 0,
-          quantity: quantity,
-        });
+        gtmItems.push(buildGtmItem(checkbox, idProduct, idProductAttribute, quantity));
       }
     });
 

@@ -239,13 +239,35 @@ class AbandonedCartFinder
      * template needs.
      *
      * @param array<int, array{id_product:int, id_product_attribute:int, quantity:int}> $products
+     * @param int $idAbandonedCart source cart, used only to pull each row's raw
+     *                             cart data (manufacturer, category, reduction...)
+     *                             for the optional GTM item mapping below.
      *
      * @return array<int, array>
      */
-    public function presentProducts(array $products): array
+    public function presentProducts(array $products, int $idAbandonedCart): array
     {
         $context = Context::getContext();
         $presented = [];
+
+        // GtmDataLayer::mapItem() is the single source of truth this whole
+        // shop uses to build a GA4 item[] entry (item_brand, item_variant,
+        // external_id, categories...) from a raw cart product row — reusing
+        // it here keeps the add_to_cart event this modal triggers consistent
+        // with every other event on the site, instead of hand-rolling a
+        // partial item. Guarded exactly like the nw_multidomainmanager/NwTld
+        // usage above: this module must keep working on a shop without gtm
+        // installed, just with a plainer item (name/price only, built
+        // client-side from data-name/data-price).
+        $gtmRowsByKey = [];
+        $gtm = Module::isEnabled('gtm') ? Module::getInstanceByName('gtm') : null;
+        if ($gtm) {
+            $abandonedCart = new Cart($idAbandonedCart);
+            foreach ($abandonedCart->getProducts(true) as $row) {
+                $key = (int) $row['id_product'] . '-' . (int) $row['id_product_attribute'];
+                $gtmRowsByKey[$key] = $row;
+            }
+        }
 
         foreach ($products as $productData) {
             $product = new Product((int) $productData['id_product'], false, $context->language->id);
@@ -292,6 +314,15 @@ class AbandonedCartFinder
                 'price' => round($unitPrice, 2),
                 'image_url' => $imageUrl,
             ];
+
+            $gtmRow = $gtmRowsByKey[(int) $productData['id_product'] . '-' . $idProductAttribute] ?? null;
+            if ($gtm && $gtmRow) {
+                $gtmItem = $gtm->dataLayer()->mapItem($gtmRow);
+                $presented[count($presented) - 1]['gtm_item_json'] = json_encode(
+                    $gtmItem,
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                );
+            }
         }
 
         return $presented;

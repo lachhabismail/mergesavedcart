@@ -28,7 +28,8 @@
                      data-id-product-attribute="{$product.id_product_attribute}"
                      data-quantity="{$product.quantity}"
                      data-name="{$product.name|escape:'quotes'}"
-                     data-price="{$product.price}">
+                     data-price="{$product.price}"
+                     {if $product.gtm_item_json}data-gtm-item="{$product.gtm_item_json|escape:'html'}"{/if}>
               {if $product.image_url}
                 <div class="position-relative flex-shrink-0 pe-3">
                   <img src="{$product.image_url}" alt="{$product.name|escape:'quotes'}" width="64" height="64">

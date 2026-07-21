@@ -94,7 +94,7 @@ class MergeSavedCart extends Module
         }
 
         $this->context->smarty->assign([
-            'mergesavedcart_products' => $finder->presentProducts($proposal['products']),
+            'mergesavedcart_products' => $finder->presentProducts($proposal['products'], $idAbandonedCart),
             'mergesavedcart_restore_url' => $this->context->link->getModuleLink($this->name, 'restore', [], true),
             'mergesavedcart_abandoned_cart_id' => $idAbandonedCart,
             // Single shop-level currency for the JS-side add_to_cart GTM event
