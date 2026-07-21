@@ -19,6 +19,8 @@ namespace MergeSavedCart\Service;
 use Cart;
 use Context;
 use Db;
+use Module;
+use NwTld;
 use Product;
 use Tools;
 use Validate;
@@ -38,6 +40,15 @@ class AbandonedCartFinder
      * is computed here, since the current cart can still change before the
      * customer ever sees the modal.
      *
+     * When `nw_multidomainmanager` is enabled, this shop is really several
+     * independent storefronts ("TLDs") sharing one PrestaShop install — a
+     * cart started on one domain must never be proposed for restoration on
+     * another, since product availability/pricing differ per TLD. The
+     * candidate cart is therefore joined against `nw_order` (the module's
+     * cart→TLD association table) and restricted to the current request's
+     * TLD. If the module is active but the current request has no resolved
+     * TLD, we can't safely vouch for any cart, so nothing is proposed.
+     *
      * @param int $idCustomer
      * @param int $idCurrentCart
      *
@@ -45,9 +56,22 @@ class AbandonedCartFinder
      */
     public function findAbandonedCartId(int $idCustomer, int $idCurrentCart): ?int
     {
+        $tldJoin = '';
+
+        if ($this->isMultidomainManagerActive()) {
+            $idTld = $this->getCurrentTldId();
+
+            if ($idTld === null) {
+                return null;
+            }
+
+            $tldJoin = ' INNER JOIN `' . _DB_PREFIX_ . 'nw_order` nwo ON nwo.`id_cart` = c.`id_cart` AND nwo.`id_nw_tld` = ' . $idTld;
+        }
+
         $sql = 'SELECT c.`id_cart`
                 FROM `' . _DB_PREFIX_ . 'cart` c
-                INNER JOIN `' . _DB_PREFIX_ . 'cart_product` cp ON cp.`id_cart` = c.`id_cart`
+                INNER JOIN `' . _DB_PREFIX_ . 'cart_product` cp ON cp.`id_cart` = c.`id_cart`'
+                . $tldJoin . '
                 WHERE c.`id_customer` = ' . (int) $idCustomer . '
                     AND c.`id_cart` != ' . (int) $idCurrentCart . '
                     AND NOT EXISTS (
@@ -120,10 +144,72 @@ class AbandonedCartFinder
     {
         $cart = new Cart($idAbandonedCart);
 
-        return Validate::isLoadedObject($cart)
-            && (int) $cart->id_customer === $idCustomer
-            && !$cart->orderExists()
-            && count($cart->getProducts(true)) > 0;
+        if (!Validate::isLoadedObject($cart)
+            || (int) $cart->id_customer !== $idCustomer
+            || $cart->orderExists()
+            || count($cart->getProducts(true)) === 0
+        ) {
+            return false;
+        }
+
+        return !$this->isMultidomainManagerActive() || $this->isSameTld($idAbandonedCart);
+    }
+
+    /**
+     * True when the multi-storefront module is active and its TLD entity is
+     * autoloadable — mirrors the guard convention already used by
+     * wwwnutriconnect (`Module::isEnabled('nw_multidomainmanager')`) before
+     * touching any `NwTld` API.
+     *
+     * @return bool
+     */
+    private function isMultidomainManagerActive(): bool
+    {
+        return Module::isEnabled('nw_multidomainmanager');
+    }
+
+    /**
+     * The current request's active TLD id (`Context::getContext()->shop->nwTld->id`),
+     * or null if no TLD resolved for this host (unmapped domain, back
+     * office, CLI...). Callers must not treat a null result as "no
+     * restriction" — it means the TLD is unknown, not universal.
+     *
+     * @return int|null
+     */
+    private function getCurrentTldId(): ?int
+    {
+        $shop = Context::getContext()->shop;
+
+        if (isset($shop->nwTld) && Validate::isLoadedObject($shop->nwTld)) {
+            return (int) $shop->nwTld->id;
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether $idCart is tagged (via nw_multidomainmanager's `nw_order`
+     * table) with the same TLD as the current request. A cart with no TLD
+     * association at all (never went through hookActionCartSave, e.g. a
+     * pre-module or back-office cart) does not match — null never equals a
+     * resolved TLD id, even if the current request's TLD also happened to
+     * be unresolved.
+     *
+     * @param int $idCart
+     *
+     * @return bool
+     */
+    private function isSameTld(int $idCart): bool
+    {
+        $idTld = $this->getCurrentTldId();
+
+        if ($idTld === null) {
+            return false;
+        }
+
+        $cartTld = NwTld::getInstanceByCart($idCart);
+
+        return $cartTld !== null && (int) $cartTld->id === $idTld;
     }
 
     /**
